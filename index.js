@@ -1,5 +1,5 @@
 const { Client } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const qrcode = require('qrcode-port:3000');
 
 const {
     GoogleGenerativeAI,
@@ -95,6 +95,48 @@ async function run(message) {
       }
         
         return response;
+    import express from 'express';
+import { Server } from 'socket.io';
+import { createServer } from 'http';
+import makeWASocket, { useMultiFileAuthState } from '@whiskeysockets/baileys';
+import * as dotenv from 'dotenv';
+import qrcode from 'qrcode';
+
+dotenv.config();
+
+const app = express();
+const server = createServer(app);
+const io = new Server(server);
+
+app.use(express.static('public'));
+
+app.get('/', (req, res) => {
+    res.sendFile('qr.html', { root: './public' });
+});
+
+async function connectToWhatsApp() {
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+    const sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: false, // ❌ Terminal QR දැක්වෙන්නෙ නැ
+    });
+
+    sock.ev.on('connection.update', async (update) => {
+        const { qr, connection, lastDisconnect } = update;
+        if (qr) {
+            const qrImageUrl = await qrcode.toDataURL(qr);
+            io.emit('qr', qrImageUrl);
+            console.log('🔵 QR code updated, visit your web page to scan.');
+        }
+
+        if (connection === 'close') {
+            const shouldReconnect = lastDisconnect.error?.output?.statusCode !== 401;
+            if (shouldReconnect) {connectToWhatsApp();
+            }
+        } else if (connection === 'open') {
+            console.log('✅ WhatsApp connected!');
+        }
+    });
   }
 
 
